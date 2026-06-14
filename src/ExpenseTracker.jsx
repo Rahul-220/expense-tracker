@@ -503,6 +503,39 @@ export default function ExpenseTracker() {
   const expenseCols = "0.85fr 1.2fr 1.1fr 1fr 0.8fr 24px";
   const accountCols = "1fr 1.2fr 0.9fr 1fr 24px";
 
+  const exportData = () => {
+    const data = { income, expenses, accounts, subcats, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `expense-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    ping("Data exported — save that file somewhere safe!");
+  };
+
+  const importData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.expenses && !data.income) { ping("Invalid file — doesn't look like a tracker backup"); return; }
+        update(
+          data.income   || [],
+          data.expenses || [],
+          data.accounts?.length ? data.accounts : DEFAULT_ACCOUNTS,
+          data.subcats && Object.keys(data.subcats).length ? data.subcats : DEFAULT_SUBCATS
+        );
+        ping(`Imported: ${data.expenses?.length || 0} expenses, ${data.income?.length || 0} income entries`);
+      } catch { ping("Couldn't read that file — make sure it's a tracker backup JSON"); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   if (!loaded) return (
     <div className="app flex items-center justify-center" style={{ minHeight: "100vh", color: "#5EEAD4", fontWeight: 600 }}>
       <style>{css}</style>Loading your tracker…
@@ -524,7 +557,17 @@ export default function ExpenseTracker() {
               {expenses.length} expense{expenses.length === 1 ? "" : "s"} · {income.length} income entr{income.length === 1 ? "y" : "ies"} · {categories.length} categories
             </p>
           </div>
-          <button className="ghost-btn" onClick={resetAll}>Reset all data</button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button className="ghost-btn" style={{ borderColor: "rgba(45,212,191,.3)", color: "var(--mint-soft)" }}
+              onClick={exportData} title="Download all your data as a JSON backup">
+              ↓ Export data
+            </button>
+            <label className="ghost-btn" style={{ cursor: "pointer" }} title="Load a previously exported backup file">
+              ↑ Import data
+              <input type="file" accept=".json" style={{ display: "none" }} onChange={importData} />
+            </label>
+            <button className="ghost-btn" onClick={resetAll}>Reset all</button>
+          </div>
         </div>
 
         {/* KPIs */}
